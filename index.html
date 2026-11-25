@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LEGO-Mosaik-Generator</title>
+<style>
+  :root {
+    --bg: #0e1116;
+    --panel: #171c24;
+    --panel-2: #1f2630;
+    --border: #2a323d;
+    --text: #e6e9ee;
+    --muted: #9aa4b2;
+    --accent: #f2cd37;
+    --accent-2: #d01012;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    overflow: hidden;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 20px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+  }
+  header .logo {
+    width: 28px; height: 28px;
+    background: var(--accent-2);
+    border-radius: 5px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 3px;
+    padding: 5px;
+  }
+  header .logo span { background: #fff; border-radius: 50%; }
+  header h1 { font-size: 17px; margin: 0; font-weight: 650; }
+  header .sub { color: var(--muted); font-size: 13px; }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 300px 1fr 280px;
+    height: calc(100vh - 59px);
+  }
+  .col { overflow-y: auto; padding: 18px; }
+  .col.controls { background: var(--panel); border-right: 1px solid var(--border); }
+  .col.stage { display: flex; align-items: center; justify-content: center; background:
+    repeating-conic-gradient(#15191f 0% 25%, #11151a 0% 50%) 50% / 24px 24px; }
+  .col.parts { background: var(--panel); border-left: 1px solid var(--border); }
+
+  .group { margin-bottom: 22px; }
+  .group h2 {
+    font-size: 12px; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--muted); margin: 0 0 10px;
+  }
+  label.field { display: block; margin-bottom: 12px; font-size: 13px; color: var(--muted); }
+  label.field span { display: block; margin-bottom: 5px; }
+
+  select, input[type="number"] {
+    width: 100%; padding: 8px 10px; background: var(--panel-2);
+    color: var(--text); border: 1px solid var(--border); border-radius: 7px;
+    font-size: 14px;
+  }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  .seg { display: flex; flex-direction: column; gap: 6px; }
+  .seg button {
+    text-align: left; padding: 9px 11px; background: var(--panel-2);
+    color: var(--text); border: 1px solid var(--border); border-radius: 7px;
+    cursor: pointer; font-size: 13px; display: flex; align-items: center; gap: 9px;
+  }
+  .seg button .icn { width: 18px; height: 18px; flex: none; }
+  .seg button.active { border-color: var(--accent); background: #2a2c1f; }
+  .seg.seg-h { flex-direction: row; flex-wrap: wrap; }
+  .seg.seg-h button { flex: 1 1 calc(50% - 3px); justify-content: center; padding: 8px 6px; }
+
+  .toggle { display: flex; align-items: center; justify-content: space-between;
+    padding: 9px 11px; background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 7px; cursor: pointer; font-size: 13px; }
+  .switch { width: 38px; height: 22px; background: var(--border); border-radius: 11px;
+    position: relative; transition: .15s; flex: none; }
+  .switch::after { content: ""; position: absolute; width: 18px; height: 18px;
+    background: #fff; border-radius: 50%; top: 2px; left: 2px; transition: .15s; }
+  .toggle.on .switch { background: var(--accent); }
+  .toggle.on .switch::after { left: 18px; }
+
+  .drop {
+    border: 2px dashed var(--border); border-radius: 10px; padding: 22px 14px;
+    text-align: center; color: var(--muted); cursor: pointer; font-size: 13px;
+    transition: .15s; line-height: 1.5;
+  }
+  .drop.hover { border-color: var(--accent); color: var(--text); background: var(--panel-2); }
+  .drop b { color: var(--text); }
+
+  .btn {
+    width: 100%; padding: 11px; border: none; border-radius: 8px; cursor: pointer;
+    font-size: 14px; font-weight: 600; margin-bottom: 9px;
+  }
+  .btn.primary { background: var(--accent); color: #1a1a1a; }
+  .btn.ghost { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+
+  #canvasWrap { background: #fff; padding: 10px; border-radius: 6px;
+    box-shadow: 0 10px 40px rgba(0,0,0,.5); max-width: 92%; max-height: 92%; }
+  canvas#preview { display: block; image-rendering: pixelated; max-width: 100%; max-height: 78vh; }
+  .empty { color: var(--muted); text-align: center; font-size: 15px; }
+
+  .stat { display: flex; justify-content: space-between; font-size: 13px;
+    padding: 4px 0; color: var(--muted); }
+  .stat b { color: var(--text); }
+  .plist { list-style: none; margin: 8px 0 0; padding: 0; }
+  .plist li { display: flex; align-items: center; gap: 9px; padding: 5px 0;
+    font-size: 13px; border-bottom: 1px solid var(--border); }
+  .sw { width: 16px; height: 16px; border-radius: 4px; flex: none;
+    border: 1px solid rgba(255,255,255,.15); }
+  .plist .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .plist .qt { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .hint { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+  label.field.slider span { display: flex; justify-content: space-between; }
+  label.field.slider i { color: var(--text); font-style: normal; font-variant-numeric: tabular-nums; }
+  input[type="range"] { width: 100%; accent-color: var(--accent); cursor: pointer; }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><span></span><span></span><span></span><span></span></div>
+  <div>
+    <h1>LEGO-Mosaik-Generator</h1>
+    <div class="sub">Bild rein → Mosaik aus 1×1-Teilen → BrickLink-Bestellliste</div>
+  </div>
+</header>
+
+<div class="layout">
+  <!-- LINKS: Steuerung -->
+  <div class="col controls">
+    <div class="group">
+      <h2>Bild</h2>
+      <div class="drop" id="drop">
+        <b>Bild hierher ziehen</b><br>oder klicken zum Auswählen
+      </div>
+      <input type="file" id="file" accept="image/*" hidden>
+    </div>
+
+    <div class="group">
+      <h2>Größe (Noppen)</h2>
+      <label class="field">
+        <select id="size">
+          <option value="16">16 — klein (Bauplatte 91405)</option>
+          <option value="32">32 — mittel (Bauplatte 3811)</option>
+          <option value="48" selected>48 — groß (Bauplatte 10701)</option>
+          <option value="64">64 — sehr detailliert</option>
+          <option value="custom">Custom …</option>
+        </select>
+      </label>
+      <div class="row2" id="customSize" style="display:none">
+        <label class="field"><span>Breite</span><input type="number" id="cw" value="48" min="1" max="256"></label>
+        <label class="field"><span>Höhe</span><input type="number" id="ch" value="48" min="1" max="256"></label>
+      </div>
+    </div>
+
+    <div class="group" id="orientGroup">
+      <h2>Format</h2>
+      <div class="seg seg-h" id="orient">
+        <button data-o="square" class="active">⬛ Quadrat</button>
+        <button data-o="land">▭ Quer</button>
+        <button data-o="port">▯ Hoch</button>
+        <button data-o="auto">🖼 Auto</button>
+      </div>
+      <div class="hint">„Auto" übernimmt das Seitenverhältnis deines Bildes (kein Beschnitt).</div>
+    </div>
+
+    <div class="group">
+      <h2>Teil-Typ</h2>
+      <div class="seg" id="part">
+        <button data-id="3024" class="active">
+          <svg class="icn" viewBox="0 0 20 20"><rect x="2" y="2" width="16" height="16" rx="2" fill="#888"/><circle cx="10" cy="10" r="4" fill="#aaa"/></svg>
+          1×1 Plate <span style="color:var(--muted)">· 3024</span>
+        </button>
+        <button data-id="3070b">
+          <svg class="icn" viewBox="0 0 20 20"><rect x="2" y="2" width="16" height="16" rx="2" fill="#888"/></svg>
+          1×1 Tile <span style="color:var(--muted)">· 3070b</span>
+        </button>
+        <button data-id="4073">
+          <svg class="icn" viewBox="0 0 20 20"><circle cx="10" cy="10" r="8" fill="#888"/><circle cx="10" cy="10" r="3.5" fill="#aaa"/></svg>
+          1×1 Round Plate <span style="color:var(--muted)">· 4073</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="group">
+      <h2>Optionen</h2>
+      <div class="toggle" id="dither"><span>Dithering (Floyd-Steinberg)</span><div class="switch"></div></div>
+      <div style="height:9px"></div>
+      <div class="toggle on" id="grid"><span>Raster anzeigen</span><div class="switch"></div></div>
+    </div>
+
+    <div class="group">
+      <h2>Bild-Feinabstimmung</h2>
+      <label class="field slider"><span>Helligkeit <i id="vBright">0</i></span>
+        <input type="range" id="bright" min="-100" max="100" value="0"></label>
+      <label class="field slider"><span>Kontrast <i id="vContrast">0</i></span>
+        <input type="range" id="contrast" min="-100" max="100" value="0"></label>
+      <label class="field slider"><span>Sättigung <i id="vSat">0</i></span>
+        <input type="range" id="sat" min="-100" max="100" value="0"></label>
+      <button class="btn ghost" id="reset" style="margin-top:4px">Zurücksetzen</button>
+    </div>
+
+    <div class="group">
+      <h2>Rahmen</h2>
+      <div class="toggle" id="frame"><span>Rahmen hinzufügen</span><div class="switch"></div></div>
+      <div id="frameOpts" style="display:none;margin-top:10px">
+        <label class="field"><span>Dicke (Noppen)</span>
+          <input type="number" id="frameT" value="2" min="1" max="10"></label>
+        <label class="field"><span>Rahmenfarbe</span>
+          <select id="frameColor"></select></label>
+      </div>
+    </div>
+  </div>
+
+  <!-- MITTE: Vorschau -->
+  <div class="col stage">
+    <div id="canvasWrap" style="display:none"><canvas id="preview"></canvas></div>
+    <div class="empty" id="empty">🧱<br>Noch kein Bild geladen.<br><span style="font-size:13px">Lade links ein Bild, um das Mosaik zu erzeugen.</span></div>
+  </div>
+
+  <!-- RECHTS: Teileliste -->
+  <div class="col parts">
+    <div class="group">
+      <h2>Übersicht</h2>
+      <div class="stat"><span>Maße</span><b id="sDim">–</b></div>
+      <div class="stat"><span>Teile gesamt</span><b id="sTotal">–</b></div>
+      <div class="stat"><span>Farben</span><b id="sColors">–</b></div>
+    </div>
+    <div class="group">
+      <h2>Export</h2>
+      <button class="btn primary" id="expXml" disabled>BrickLink-XML exportieren</button>
+      <button class="btn ghost" id="expPng" disabled>Vorschau als PNG</button>
+      <button class="btn ghost" id="expGuide" disabled>Bauanleitung drucken</button>
+      <div class="hint">Die XML auf BrickLink unter „Want&nbsp;→ Upload&nbsp;(XML)" einlesen, dann alle Teile bestellen.</div>
+    </div>
+    <div class="group">
+      <h2>Teileliste</h2>
+      <ul class="plist" id="plist"><li style="color:var(--muted);border:none">–</li></ul>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   Farbtabelle — kuratierte, breit verfügbare BrickLink-Solid-Farben.
+   blId = BrickLink-Color-ID (bestätigt über bricklink.com/catalog/color-guide)
+   rgb  = etablierte LDraw/BrickLink-RGB-Werte
+   parts = Teil-Typen, für die die Farbe als 1×1 real verfügbar ist
+   ============================================================ */
+/* hex = exakte "Bricklink RGB"-Spalte aus dem Mecabricks-Farbchart =
+   genau die Swatch-Farbe, die BrickLink im Katalog anzeigt. */
+const ALL = ["3024","3070b","4073"];
+const PT  = ["3024","3070b"];        // nur Plate + Tile (Rundteil seltener)
+const PALETTE = [
+  { blId: 1,   name: "White",                  hex: "#FFFFFF", parts: ALL },
+  { blId: 99,  name: "Very Light Bluish Gray", hex: "#E4E8E8", parts: PT  },
+  { blId: 86,  name: "Light Bluish Gray",      hex: "#AFB5C7", parts: ALL },
+  { blId: 85,  name: "Dark Bluish Gray",       hex: "#595D60", parts: ALL },
+  { blId: 11,  name: "Black",                  hex: "#212121", parts: ALL },
+  { blId: 5,   name: "Red",                    hex: "#B30006", parts: ALL },
+  { blId: 59,  name: "Dark Red",               hex: "#6A0E15", parts: ALL },
+  { blId: 4,   name: "Orange",                 hex: "#FF7E14", parts: ALL },
+  { blId: 68,  name: "Dark Orange",            hex: "#B35408", parts: ALL },
+  { blId: 110, name: "Bright Light Orange",    hex: "#FFC700", parts: PT  },
+  { blId: 3,   name: "Yellow",                 hex: "#FFE001", parts: ALL },
+  { blId: 103, name: "Bright Light Yellow",    hex: "#FFF08C", parts: PT  },
+  { blId: 34,  name: "Lime",                   hex: "#C4E000", parts: ALL },
+  { blId: 36,  name: "Bright Green",           hex: "#10CB31", parts: ALL },
+  { blId: 6,   name: "Green",                  hex: "#00923D", parts: ALL },
+  { blId: 80,  name: "Dark Green",             hex: "#2E5543", parts: ALL },
+  { blId: 48,  name: "Sand Green",             hex: "#A2BFA3", parts: PT  },
+  { blId: 155, name: "Olive Green",            hex: "#9B9A5A", parts: PT  },
+  { blId: 39,  name: "Dark Turquoise",         hex: "#069D9F", parts: ALL },
+  { blId: 156, name: "Medium Azure",           hex: "#68C3E2", parts: ALL },
+  { blId: 153, name: "Dark Azure",             hex: "#469BC3", parts: ALL },
+  { blId: 42,  name: "Medium Blue",            hex: "#82ADD8", parts: ALL },
+  { blId: 7,   name: "Blue",                   hex: "#0057A6", parts: ALL },
+  { blId: 63,  name: "Dark Blue",              hex: "#243757", parts: ALL },
+  { blId: 55,  name: "Sand Blue",              hex: "#8899AB", parts: PT  },
+  { blId: 157, name: "Medium Lavender",        hex: "#A06EB9", parts: PT  },
+  { blId: 154, name: "Lavender",               hex: "#CDA4DE", parts: PT  },
+  { blId: 24,  name: "Purple",                 hex: "#671F81", parts: ALL },
+  { blId: 89,  name: "Dark Purple",            hex: "#5F2683", parts: ALL },
+  { blId: 71,  name: "Magenta",                hex: "#B72276", parts: ALL },
+  { blId: 47,  name: "Dark Pink",              hex: "#EF5BB3", parts: ALL },
+  { blId: 104, name: "Bright Pink",            hex: "#FFBBFF", parts: ALL },
+  { blId: 90,  name: "Light Nougat",           hex: "#FFC995", parts: ALL },
+  { blId: 28,  name: "Nougat",                 hex: "#FFAF7D", parts: ALL },
+  { blId: 150, name: "Medium Nougat",          hex: "#AA7D55", parts: ALL },
+  { blId: 240, name: "Medium Brown",           hex: "#755945", parts: PT  },
+  { blId: 88,  name: "Reddish Brown",          hex: "#82422A", parts: ALL },
+  { blId: 69,  name: "Dark Tan",               hex: "#B89869", parts: ALL },
+  { blId: 2,   name: "Tan",                    hex: "#EED9A4", parts: ALL },
+];
+
+/* ---- Farb-Helfer: hex → rgb, rgb → Lab, ΔE-Distanz ---- */
+function hexToRgb(h){ return [parseInt(h.slice(1,3),16), parseInt(h.slice(3,5),16), parseInt(h.slice(5,7),16)]; }
+function rgbToLab(r,g,b){
+  let R=r/255, G=g/255, B=b/255;
+  R = R>0.04045 ? Math.pow((R+0.055)/1.055,2.4) : R/12.92;
+  G = G>0.04045 ? Math.pow((G+0.055)/1.055,2.4) : G/12.92;
+  B = B>0.04045 ? Math.pow((B+0.055)/1.055,2.4) : B/12.92;
+  let X=(R*0.4124+G*0.3576+B*0.1805)/0.95047;
+  let Y=(R*0.2126+G*0.7152+B*0.0722)/1.00000;
+  let Z=(R*0.0193+G*0.1192+B*0.9505)/1.08883;
+  const f=t=> t>0.008856 ? Math.cbrt(t) : (7.787*t+16/116);
+  X=f(X); Y=f(Y); Z=f(Z);
+  return [116*Y-16, 500*(X-Y), 200*(Y-Z)];
+}
+/* CIEDE2000 — perzeptuell genauer Farbabstand (besser als simple Lab-Distanz) */
+function ciede2000(L1,a1,b1, L2,a2,b2){
+  const rad=Math.PI/180, deg=180/Math.PI;
+  const C1=Math.hypot(a1,b1), C2=Math.hypot(a2,b2);
+  const Cb=(C1+C2)/2;
+  const G=0.5*(1-Math.sqrt(Math.pow(Cb,7)/(Math.pow(Cb,7)+Math.pow(25,7))));
+  const a1p=(1+G)*a1, a2p=(1+G)*a2;
+  const C1p=Math.hypot(a1p,b1), C2p=Math.hypot(a2p,b2);
+  let h1p=Math.atan2(b1,a1p)*deg; if(h1p<0)h1p+=360;
+  let h2p=Math.atan2(b2,a2p)*deg; if(h2p<0)h2p+=360;
+  const dLp=L2-L1, dCp=C2p-C1p;
+  let dhp; const dh=h2p-h1p;
+  if(C1p*C2p===0) dhp=0;
+  else if(Math.abs(dh)<=180) dhp=dh;
+  else dhp = dh>180 ? dh-360 : dh+360;
+  const dHp=2*Math.sqrt(C1p*C2p)*Math.sin((dhp/2)*rad);
+  const Lbp=(L1+L2)/2, Cbp=(C1p+C2p)/2;
+  let hbp;
+  if(C1p*C2p===0) hbp=h1p+h2p;
+  else if(Math.abs(h1p-h2p)<=180) hbp=(h1p+h2p)/2;
+  else hbp = (h1p+h2p)<360 ? (h1p+h2p+360)/2 : (h1p+h2p-360)/2;
+  const T=1-0.17*Math.cos((hbp-30)*rad)+0.24*Math.cos((2*hbp)*rad)
+          +0.32*Math.cos((3*hbp+6)*rad)-0.20*Math.cos((4*hbp-63)*rad);
+  const dTheta=30*Math.exp(-Math.pow((hbp-275)/25,2));
+  const Rc=2*Math.sqrt(Math.pow(Cbp,7)/(Math.pow(Cbp,7)+Math.pow(25,7)));
+  const Sl=1+(0.015*Math.pow(Lbp-50,2))/Math.sqrt(20+Math.pow(Lbp-50,2));
+  const Sc=1+0.045*Cbp, Sh=1+0.015*Cbp*T;
+  const Rt=-Math.sin(2*dTheta*rad)*Rc;
+  return Math.sqrt(Math.pow(dLp/Sl,2)+Math.pow(dCp/Sc,2)+Math.pow(dHp/Sh,2)
+         +Rt*(dCp/Sc)*(dHp/Sh));
+}
+
+/* sRGB ↔ linear (für gamma-korrektes Verkleinern) */
+function srgbToLin(c){ c/=255; return c>0.04045?Math.pow((c+0.055)/1.055,2.4):c/12.92; }
+function linToSrgb(c){ return 255*(c>0.0031308?1.055*Math.pow(c,1/2.4)-0.055:12.92*c); }
+
+/* Vorberechnete rgb/lab für ganze Palette */
+PALETTE.forEach(c=>{ c.rgb=hexToRgb(c.hex); c.lab=rgbToLab(...c.rgb); });
+
+/* ============================================================
+   State
+   ============================================================ */
+const state = { img:null, partId:"3024", dither:false, grid:true, lastGrid:null,
+                bright:0, contrast:0, sat:0,
+                orient:"square", frame:false, frameT:2, frameColor:11 };
+
+/* ---- DOM ---- */
+const $ = id => document.getElementById(id);
+const drop=$("drop"), file=$("file"), sizeSel=$("size"), customSize=$("customSize"),
+      cw=$("cw"), ch=$("ch"), partSeg=$("part"), ditherT=$("dither"), gridT=$("grid"),
+      preview=$("preview"), wrap=$("canvasWrap"), empty=$("empty"),
+      expXml=$("expXml"), expPng=$("expPng"), expGuide=$("expGuide"), plist=$("plist");
+
+/* ---- Bild laden ---- */
+drop.onclick=()=>file.click();
+file.onchange=e=>{ if(e.target.files[0]) loadImage(e.target.files[0]); };
+["dragenter","dragover"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add("hover");}));
+["dragleave","drop"].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove("hover");}));
+drop.addEventListener("drop",e=>{ const f=e.dataTransfer.files[0]; if(f&&f.type.startsWith("image/")) loadImage(f); });
+function loadImage(f){
+  const r=new FileReader();
+  r.onload=()=>{ const im=new Image(); im.onload=()=>{ state.img=im; render(); }; im.src=r.result; };
+  r.readAsDataURL(f);
+}
+
+/* ---- Steuerung ---- */
+sizeSel.onchange=()=>{ const c=sizeSel.value==="custom";
+  customSize.style.display=c?"grid":"none"; $("orientGroup").style.display=c?"none":"block"; render(); };
+cw.oninput=ch.oninput=render;
+partSeg.querySelectorAll("button").forEach(b=>b.onclick=()=>{
+  partSeg.querySelectorAll("button").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active"); state.partId=b.dataset.id; fillFrameColors(); render();
+});
+
+/* ---- Format (Ausrichtung) ---- */
+const orientSeg=$("orient");
+orientSeg.querySelectorAll("button").forEach(b=>b.onclick=()=>{
+  orientSeg.querySelectorAll("button").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active"); state.orient=b.dataset.o; render();
+});
+
+/* ---- Rahmen ---- */
+const frameT=$("frameT"), frameColorSel=$("frameColor"), frameOpts=$("frameOpts");
+function fillFrameColors(){
+  const pal=activePalette();
+  if(!pal.find(c=>c.blId===state.frameColor)) state.frameColor=pal[0].blId;
+  frameColorSel.innerHTML="";
+  for(const c of pal){
+    const o=document.createElement("option");
+    o.value=c.blId; o.textContent=c.name; if(c.blId===state.frameColor)o.selected=true;
+    frameColorSel.appendChild(o);
+  }
+}
+$("frame").onclick=()=>{ state.frame=!state.frame; $("frame").classList.toggle("on",state.frame);
+  frameOpts.style.display=state.frame?"block":"none"; render(); };
+frameT.oninput=()=>{ state.frameT=Math.max(1,Math.min(10,parseInt(frameT.value)||1)); render(); };
+frameColorSel.onchange=()=>{ state.frameColor=parseInt(frameColorSel.value); render(); };
+ditherT.onclick=()=>{ state.dither=!state.dither; ditherT.classList.toggle("on",state.dither); render(); };
+gridT.onclick=()=>{ state.grid=!state.grid; gridT.classList.toggle("on",state.grid); render(); };
+
+/* ---- Bild-Feinabstimmung (Slider) ---- */
+const brightS=$("bright"), contrastS=$("contrast"), satS=$("sat");
+function bindSlider(el,key,lbl){
+  el.oninput=()=>{ state[key]=parseInt(el.value); $(lbl).textContent=state[key]; if(state.img) render(); };
+}
+bindSlider(brightS,"bright","vBright");
+bindSlider(contrastS,"contrast","vContrast");
+bindSlider(satS,"sat","vSat");
+$("reset").onclick=()=>{
+  state.bright=state.contrast=state.sat=0;
+  brightS.value=contrastS.value=satS.value=0;
+  $("vBright").textContent=$("vContrast").textContent=$("vSat").textContent="0";
+  if(state.img) render();
+};
+
+/* ---- Maße ermitteln (Größe × Format) ---- */
+function dims(){
+  if(sizeSel.value==="custom"){
+    let w=Math.max(1,Math.min(256,parseInt(cw.value)||1));
+    let h=Math.max(1,Math.min(256,parseInt(ch.value)||1));
+    return [w,h];
+  }
+  const N=parseInt(sizeSel.value);
+  if(state.orient==="land")  return [Math.round(N*4/3), N];
+  if(state.orient==="port")  return [N, Math.round(N*4/3)];
+  if(state.orient==="auto" && state.img){
+    const a=state.img.width/state.img.height;
+    return a>=1 ? [N, Math.max(1,Math.round(N/a))] : [Math.max(1,Math.round(N*a)), N];
+  }
+  return [N,N]; // square
+}
+
+/* ---- Aktive Palette (nach Teil-Typ gefiltert) ---- */
+function activePalette(){ return PALETTE.filter(c=>c.parts.includes(state.partId)); }
+function nearest(pal,r,g,b){
+  const [L,A,B]=rgbToLab(r,g,b); let best=pal[0],bd=Infinity;
+  for(const c of pal){ const d=ciede2000(L,A,B, c.lab[0],c.lab[1],c.lab[2]); if(d<bd){bd=d;best=c;} }
+  return best;
+}
+
+/* ============================================================
+   Hauptberechnung + Render
+   ============================================================ */
+function render(){
+  if(!state.img){ return; }
+  const [W,H]=dims();
+  const pal=activePalette();
+
+  // 1. "Cover"-Zuschnitt der Quelle, dann in moderater Auflösung rendern
+  const ir=state.img.width/state.img.height, tr=W/H;
+  let sw,sh,sx,sy;
+  if(ir>tr){ sh=state.img.height; sw=sh*tr; sx=(state.img.width-sw)/2; sy=0; }
+  else     { sw=state.img.width;  sh=sw/tr; sx=0; sy=(state.img.height-sh)/2; }
+  const cap=1000; // begrenzt Rechenaufwand
+  let iw=Math.round(sw), ih=Math.round(sh);
+  const sc=Math.min(1, cap/Math.max(iw,ih));
+  iw=Math.max(W,Math.round(iw*sc)); ih=Math.max(H,Math.round(ih*sc));
+  const off=document.createElement("canvas"); off.width=iw; off.height=ih;
+  const octx=off.getContext("2d"); octx.imageSmoothingEnabled=true; octx.imageSmoothingQuality="high";
+  octx.drawImage(state.img,sx,sy,sw,sh,0,0,iw,ih);
+  const src=octx.getImageData(0,0,iw,ih).data;
+
+  // 2. Gamma-korrekt auf W×H mitteln (im linearen Lichtraum) + Bild-Feinabstimmung
+  const buf=new Float32Array(W*H*3);
+  const cf=(259*(state.contrast+255))/(255*(259-state.contrast)); // Kontrastfaktor
+  const satF=1+state.sat/100, brF=state.bright*1.275;
+  const adj=v=>{ v=cf*(v-128)+128+brF; return v; };           // Helligkeit+Kontrast
+  for(let cy=0;cy<H;cy++) for(let cx=0;cx<W;cx++){
+    const x0=Math.floor(cx*iw/W), x1=Math.max(x0+1,Math.floor((cx+1)*iw/W));
+    const y0=Math.floor(cy*ih/H), y1=Math.max(y0+1,Math.floor((cy+1)*ih/H));
+    let lr=0,lg=0,lb=0,n=0;
+    for(let yy=y0;yy<y1;yy++) for(let xx=x0;xx<x1;xx++){
+      const p=(yy*iw+xx)*4;
+      lr+=srgbToLin(src[p]); lg+=srgbToLin(src[p+1]); lb+=srgbToLin(src[p+2]); n++;
+    }
+    let r=linToSrgb(lr/n), g=linToSrgb(lg/n), b=linToSrgb(lb/n);
+    r=adj(r); g=adj(g); b=adj(b);
+    if(satF!==1){ const gr=0.299*r+0.587*g+0.114*b;
+      r=gr+(r-gr)*satF; g=gr+(g-gr)*satF; b=gr+(b-gr)*satF; }
+    const o=(cy*W+cx)*3; buf[o]=r; buf[o+1]=g; buf[o+2]=b;
+  }
+
+  // 3. Mapping (optional mit Floyd-Steinberg, Serpentinen-Scan)
+  const grid=new Array(W*H);
+  const clamp=v=>v<0?0:v>255?255:v;
+  for(let y=0;y<H;y++){
+    const ltr=(y%2===0), dir=ltr?1:-1;
+    for(let k=0;k<W;k++){
+      const x=ltr?k:(W-1-k);
+      const i=(y*W+x)*3;
+      const r=buf[i],g=buf[i+1],b=buf[i+2];
+      const c=nearest(pal,clamp(r),clamp(g),clamp(b));
+      grid[y*W+x]=c;
+      if(state.dither){
+        const er=r-c.rgb[0], eg=g-c.rgb[1], eb=b-c.rgb[2];
+        const push=(xx,yy,f)=>{ if(xx<0||xx>=W||yy<0||yy>=H)return; const j=(yy*W+xx)*3;
+          buf[j]+=er*f; buf[j+1]+=eg*f; buf[j+2]+=eb*f; };
+        push(x+dir,y,7/16); push(x-dir,y+1,3/16); push(x,y+1,5/16); push(x+dir,y+1,1/16);
+      }
+    }
+  }
+  // 3b. Optionalen Rahmen außen herumlegen
+  let fW=W, fH=H, fgrid=grid;
+  if(state.frame){
+    const t=state.frameT;
+    const fc=PALETTE.find(p=>p.blId===state.frameColor) || pal[0];
+    fW=W+2*t; fH=H+2*t; fgrid=new Array(fW*fH);
+    for(let y=0;y<fH;y++) for(let x=0;x<fW;x++){
+      const inside = x>=t && x<fW-t && y>=t && y<fH-t;
+      fgrid[y*fW+x] = inside ? grid[(y-t)*W+(x-t)] : fc;
+    }
+  }
+  state.lastGrid={W:fW,H:fH,grid:fgrid};
+
+  // 4. Zeichnen
+  const cell=Math.max(4,Math.min(20,Math.floor(900/Math.max(fW,fH))));
+  preview.width=fW*cell; preview.height=fH*cell;
+  const ctx=preview.getContext("2d");
+  const round = state.partId==="4073";
+  for(let y=0;y<fH;y++) for(let x=0;x<fW;x++){
+    const c=fgrid[y*fW+x];
+    ctx.fillStyle=c.hex;
+    if(round){
+      // Hintergrund-Fuge dunkel, dann Kreis
+      ctx.fillStyle="#d7d7d7"; ctx.fillRect(x*cell,y*cell,cell,cell);
+      ctx.fillStyle=c.hex; ctx.beginPath();
+      ctx.arc(x*cell+cell/2,y*cell+cell/2,cell/2*0.92,0,Math.PI*2); ctx.fill();
+    } else {
+      ctx.fillRect(x*cell,y*cell,cell,cell);
+      if(state.partId==="3024"){ // Plate: kleine Noppe andeuten
+        ctx.fillStyle="rgba(255,255,255,.10)"; ctx.beginPath();
+        ctx.arc(x*cell+cell/2,y*cell+cell/2,cell*0.28,0,Math.PI*2); ctx.fill();
+      }
+    }
+  }
+  if(state.grid && cell>=6){
+    ctx.strokeStyle="rgba(0,0,0,.18)"; ctx.lineWidth=1;
+    for(let x=0;x<=fW;x++){ ctx.beginPath();ctx.moveTo(x*cell,0);ctx.lineTo(x*cell,fH*cell);ctx.stroke(); }
+    for(let y=0;y<=fH;y++){ ctx.beginPath();ctx.moveTo(0,y*cell);ctx.lineTo(fW*cell,y*cell);ctx.stroke(); }
+  }
+
+  wrap.style.display="block"; empty.style.display="none";
+  expXml.disabled=expPng.disabled=expGuide.disabled=false;
+  updateParts(fW,fH,fgrid);
+}
+
+/* ---- Teileliste + Übersicht ---- */
+function tally(grid){
+  const m=new Map();
+  for(const c of grid){ m.set(c.blId,(m.get(c.blId)||0)+1); }
+  return m;
+}
+function updateParts(W,H,grid){
+  const m=tally(grid);
+  const items=[...m.entries()].map(([id,q])=>({c:PALETTE.find(p=>p.blId===id),q}))
+                .sort((a,b)=>b.q-a.q);
+  $("sDim").textContent=`${W} × ${H}`;
+  $("sTotal").textContent=(W*H).toLocaleString("de-DE");
+  $("sColors").textContent=items.length;
+  plist.innerHTML="";
+  for(const it of items){
+    const li=document.createElement("li");
+    li.innerHTML=`<span class="sw" style="background:${it.c.hex}"></span>
+      <span class="nm">${it.c.name}</span><span class="qt">${it.q.toLocaleString("de-DE")}×</span>`;
+    plist.appendChild(li);
+  }
+}
+
+/* ---- Export: BrickLink Wanted-List XML ---- */
+expXml.onclick=()=>{
+  if(!state.lastGrid)return;
+  const m=tally(state.lastGrid.grid);
+  let xml='<?xml version="1.0" encoding="UTF-8"?>\n<INVENTORY>\n';
+  for(const [id,q] of [...m.entries()].sort((a,b)=>b[1]-a[1])){
+    xml+=`  <ITEM>\n    <ITEMTYPE>P</ITEMTYPE>\n    <ITEMID>${state.partId}</ITEMID>\n`+
+         `    <COLOR>${id}</COLOR>\n    <MINQTY>${q}</MINQTY>\n    <CONDITION>N</CONDITION>\n  </ITEM>\n`;
+  }
+  xml+='</INVENTORY>\n';
+  download(xml,`lego-mosaik-${state.partId}-${state.lastGrid.W}x${state.lastGrid.H}.xml`,"application/xml");
+};
+expPng.onclick=()=>{ preview.toBlob(b=>{ const u=URL.createObjectURL(b);
+  const a=document.createElement("a"); a.href=u; a.download="lego-mosaik-vorschau.png"; a.click();
+  URL.revokeObjectURL(u); }); };
+function download(text,name,type){
+  const b=new Blob([text],{type}); const u=URL.createObjectURL(b);
+  const a=document.createElement("a"); a.href=u; a.download=name; a.click(); URL.revokeObjectURL(u);
+}
+
+/* ---- Bauanleitung (Color-by-Number, druckbar) ---- */
+const PART_NAME={ "3024":"1×1 Plate (3024)", "3070b":"1×1 Tile (3070b)", "4073":"1×1 Round Plate (4073)" };
+function buildGuide(){
+  if(!state.lastGrid) return;
+  const {W,H,grid}=state.lastGrid;
+  const m=tally(grid);
+  const order=[...m.entries()].sort((a,b)=>b[1]-a[1]).map(e=>e[0]);   // blId nach Häufigkeit
+  const idx=new Map(); order.forEach((id,i)=>idx.set(id,i+1));        // Farbnummer 1..n
+  const total=W*H;
+
+  // Raster auf Canvas mit Zahlen + Koordinaten
+  const big=Math.max(W,H)>140;
+  const cs=big?15:24, fs=big?9:12, pad=cs+6;
+  const cv=document.createElement("canvas");
+  cv.width=W*cs+pad+4; cv.height=H*cs+pad+4;
+  const g=cv.getContext("2d");
+  g.fillStyle="#fff"; g.fillRect(0,0,cv.width,cv.height);
+  g.textAlign="center"; g.textBaseline="middle";
+  for(let y=0;y<H;y++) for(let x=0;x<W;x++){
+    const c=grid[y*W+x], px=pad+x*cs, py=pad+y*cs;
+    g.fillStyle=c.hex; g.fillRect(px,py,cs,cs);
+    const lum=0.299*c.rgb[0]+0.587*c.rgb[1]+0.114*c.rgb[2];
+    g.fillStyle=lum>140?"#000":"#fff"; g.font=`bold ${fs}px sans-serif`;
+    g.fillText(idx.get(c.blId), px+cs/2, py+cs/2+1);
+  }
+  // dünne Linien
+  g.strokeStyle="rgba(0,0,0,.22)"; g.lineWidth=1;
+  for(let x=0;x<=W;x++){ g.beginPath();g.moveTo(pad+x*cs,pad);g.lineTo(pad+x*cs,pad+H*cs);g.stroke(); }
+  for(let y=0;y<=H;y++){ g.beginPath();g.moveTo(pad,pad+y*cs);g.lineTo(pad+W*cs,pad+y*cs);g.stroke(); }
+  // dicke Linien + Koordinaten alle 8
+  g.strokeStyle="#000"; g.fillStyle="#000"; g.font=`bold ${fs+1}px sans-serif`;
+  for(let x=0;x<=W;x+=8){ g.lineWidth=2;g.beginPath();g.moveTo(pad+x*cs,pad);g.lineTo(pad+x*cs,pad+H*cs);g.stroke();
+    if(x<W)g.fillText(x+1, pad+x*cs+cs/2, pad/2); }
+  for(let y=0;y<=H;y+=8){ g.lineWidth=2;g.beginPath();g.moveTo(pad,pad+y*cs);g.lineTo(pad+W*cs,pad+y*cs);g.stroke();
+    if(y<H)g.fillText(y+1, pad/2, pad+y*cs+cs/2); }
+  const dataURL=cv.toDataURL("image/png");
+
+  let rows="";
+  for(const id of order){ const c=PALETTE.find(p=>p.blId===id);
+    rows+=`<tr><td class="n">${idx.get(id)}</td><td><span class="sw" style="background:${c.hex}"></span></td>`+
+          `<td>${c.name}</td><td>BL ${id}</td><td>${m.get(id).toLocaleString("de-DE")}×</td></tr>`; }
+
+  const win=window.open("","_blank");
+  if(!win){ alert("Bitte Pop-ups für diese Seite erlauben, damit die Anleitung geöffnet werden kann."); return; }
+  win.document.write(`<!doctype html><html lang="de"><head><meta charset="utf-8">
+   <title>LEGO-Mosaik – Bauanleitung</title><style>
+    body{font-family:"Segoe UI",sans-serif;margin:24px;color:#111}
+    h1{font-size:20px;margin:0 0 4px} h2{font-size:16px;margin:20px 0 8px}
+    .meta{color:#555;margin-bottom:12px;font-size:14px}
+    p.tip{font-size:13px;color:#333;background:#f4f4f4;padding:8px 10px;border-radius:6px}
+    img{max-width:100%;border:1px solid #ccc;margin-top:8px}
+    table{border-collapse:collapse;margin-top:8px;font-size:13px}
+    th,td{border:1px solid #ddd;padding:4px 9px;text-align:left} td.n{font-weight:bold;text-align:center}
+    .sw{display:inline-block;width:16px;height:16px;border:1px solid #999;vertical-align:middle}
+    .btn{margin:6px 0 14px;padding:9px 16px;font-size:14px;cursor:pointer;border:1px solid #888;border-radius:6px;background:#fafafa}
+    @media print{.btn{display:none}}
+   </style></head><body>
+   <h1>LEGO-Mosaik – Bauanleitung</h1>
+   <div class="meta">${W} × ${H} Noppen · Teil: ${PART_NAME[state.partId]} · ${total.toLocaleString("de-DE")} Teile · ${order.length} Farben</div>
+   <button class="btn" onclick="window.print()">🖨 Drucken / als PDF speichern</button>
+   <p class="tip">Baue Reihe für Reihe von oben links. Die <b>Zahl</b> in jeder Zelle ist die Farbnummer aus der Legende.
+      Dicke Linien markieren jede 8. Noppe, die Zahlen am Rand sind die Koordinaten.</p>
+   <img src="${dataURL}" alt="Mosaik-Raster">
+   <h2>Farb-Legende</h2>
+   <table><tr><th>Nr</th><th>Farbe</th><th>Name</th><th>BrickLink</th><th>Anzahl</th></tr>${rows}</table>
+   </body></html>`);
+  win.document.close();
+}
+expGuide.onclick=buildGuide;
+
+/* ---- Init ---- */
+fillFrameColors();
+</script>
+</body>
+</html>
